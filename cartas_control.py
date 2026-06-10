@@ -1011,10 +1011,11 @@ def modulo_profesor():
         elif val >= 3.0: return 'color: #d97706; font-weight: bold'
         else: return 'color: #dc2626; font-weight: bold'
 
-    st.dataframe(
-        df_res.style.applymap(color_nota, subset=['Nota']),
-        use_container_width=True, hide_index=True
-    )
+    try:
+        styled = df_res.style.map(color_nota, subset=['Nota'])
+    except AttributeError:
+        styled = df_res.style.applymap(color_nota, subset=['Nota'])
+    st.dataframe(styled, use_container_width=True, hide_index=True)
 
     st.markdown("---")
     st.markdown("### ⬇️ Descargar resultados")
