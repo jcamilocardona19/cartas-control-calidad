@@ -12,6 +12,56 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io, random, datetime, json, os
 
+# ── Google Sheets ──────────────────────────────────────────────
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+    GSPREAD_OK = True
+except ImportError:
+    GSPREAD_OK = False
+
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1DO_VamNj70zT1qTDe185aMPIfDhTGcYjDZtzjK-kygQ/edit"
+
+def get_gsheet():
+    if not GSPREAD_OK:
+        return None
+    try:
+        scopes = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_url(SHEET_URL)
+        ws = sheet.sheet1
+        if not ws.row_values(1):
+            ws.append_row(["Nombre","Codigo","Correctas","Nota","Fecha"])
+        return ws
+    except Exception:
+        return None
+
+def guardar_en_sheets(nombre, codigo, correctas, nota, fecha):
+    try:
+        ws = get_gsheet()
+        if ws:
+            ws.append_row([nombre, codigo, int(correctas), float(nota), fecha])
+            return True
+    except Exception:
+        pass
+    return False
+
+def leer_de_sheets():
+    try:
+        ws = get_gsheet()
+        if ws:
+            datos = ws.get_all_records()
+            if datos:
+                return pd.DataFrame(datos)
+    except Exception:
+        pass
+    return None
+
 st.set_page_config(
     page_title="Cartas de Control de Calidad — UTP",
     page_icon="📊",
@@ -922,6 +972,12 @@ def modulo_quiz():
                         if "resultados_quiz" not in st.session_state:
                             st.session_state.resultados_quiz = []
                         st.session_state.resultados_quiz.append(resultado)
+                        # Guardar en Google Sheets
+                        ok = guardar_en_sheets(
+                            resultado["nombre"], resultado["codigo"],
+                            resultado["correctas"], resultado["nota"], resultado["fecha"]
+                        )
+                        st.session_state["sheets_ok"] = ok
                         st.session_state.qest = "fin"
                     st.rerun()
 
@@ -951,6 +1007,11 @@ def modulo_quiz():
             </div>
             """, unsafe_allow_html=True)
 
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.session_state.get("sheets_ok"):
+                st.markdown('<div class="alert-ok" style="text-align:center;">✅ Resultado guardado en Google Sheets</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="alert-warn" style="text-align:center;">⚠️ Resultado guardado solo en esta sesión</div>', unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("← Volver a la aplicación", use_container_width=True, type="primary"):
                 # Desactivar modo quiz y limpiar estado para próximo estudiante
