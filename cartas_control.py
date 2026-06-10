@@ -855,6 +855,7 @@ def modulo_quiz():
                 else:
                     st.warning("Por favor ingresa tu nombre y código antes de comenzar.")
             if st.button("← Volver a la aplicación", use_container_width=True):
+                st.session_state["_modo_quiz"] = False
                 st.session_state.qest = "registro"
                 st.rerun()
 
@@ -909,7 +910,7 @@ def modulo_quiz():
                     if idx < total-1:
                         st.session_state.qidx += 1
                     else:
-                        # Guardar resultado
+                        # Guardar resultado en lista acumulada
                         nota = nota_desde_correctas(st.session_state.qscore)
                         resultado = {
                             "nombre": st.session_state.qnombre,
@@ -951,13 +952,26 @@ def modulo_quiz():
             """, unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("← Volver a la aplicación", use_container_width=True):
-                st.session_state.qest = "registro"
-                st.rerun()
-            if st.button("🔄 Hacer el quiz nuevamente", use_container_width=True):
+            if st.button("← Volver a la aplicación", use_container_width=True, type="primary"):
+                # Desactivar modo quiz y limpiar estado para próximo estudiante
+                st.session_state["_modo_quiz"] = False
                 st.session_state.qest = "registro"
                 st.session_state.qnombre = ""
                 st.session_state.qcodigo = ""
+                st.session_state.qidx = 0
+                st.session_state.qscore = 0
+                st.session_state.qresp = {}
+                st.session_state.qpregs = []
+                st.rerun()
+            if st.button("🔄 Nuevo estudiante (otro quiz)", use_container_width=True):
+                # Mantener modo quiz activo pero limpiar datos del estudiante anterior
+                st.session_state.qest = "registro"
+                st.session_state.qnombre = ""
+                st.session_state.qcodigo = ""
+                st.session_state.qidx = 0
+                st.session_state.qscore = 0
+                st.session_state.qresp = {}
+                st.session_state.qpregs = []
                 st.rerun()
 
 # ══════════════════════════════════════════════════════════════
@@ -1089,13 +1103,21 @@ def modulo_referencias():
 #  APP PRINCIPAL
 # ══════════════════════════════════════════════════════════════
 def main():
-    # Si está en modo quiz, mostrar solo el quiz
-    if st.session_state.get("qest") in ["curso", "fin"] or (
-        st.session_state.get("qest") == "registro" and
-        st.session_state.get("_en_quiz", False)
-    ):
+    # La única condición para mostrar el quiz en pantalla completa
+    # es que el flag "_modo_quiz" esté activo Y el quiz no haya terminado
+    en_quiz = (
+        st.session_state.get("_modo_quiz", False) and
+        st.session_state.get("qest") in ["registro", "curso"]
+    )
+
+    if en_quiz:
         modulo_quiz()
         return
+
+    # Si el quiz terminó, desactivar el modo quiz automáticamente
+    if st.session_state.get("qest") == "fin":
+        st.session_state["_modo_quiz"] = False
+        st.session_state["qest"] = "registro"
 
     mostrar_header()
     mod = sidebar_nav()
@@ -1108,17 +1130,11 @@ def main():
     elif "Capacidad"    in mod: modulo_capacidad()
     elif "Avanzadas"    in mod: modulo_avanzadas()
     elif "Quiz"         in mod:
-        st.session_state["_en_quiz"] = True
+        st.session_state["_modo_quiz"] = True
         modulo_quiz()
-    elif "Profesor"     in mod:
-        st.session_state["_en_quiz"] = False
-        modulo_profesor()
-    elif "Exportar"     in mod:
-        st.session_state["_en_quiz"] = False
-        modulo_exportar()
-    elif "Referencias"  in mod:
-        st.session_state["_en_quiz"] = False
-        modulo_referencias()
+    elif "Profesor"     in mod: modulo_profesor()
+    elif "Exportar"     in mod: modulo_exportar()
+    elif "Referencias"  in mod: modulo_referencias()
 
 if __name__ == "__main__":
     main()
